@@ -44,12 +44,21 @@ public class MainActivity extends AppCompatActivity
 
     NfcAdapter nfcAdapter;
 
+    private Ntag_I2C_Commands channel;
+
     PendingIntent pendingIntent;
 
     private TextView myText = null;
     private TextView estadoNFCText = null;
 
     private NestedScrollView consoleScroll = null;
+
+    private final String CMD_RESET = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    private final String CMD_PS_MODE_WORKING = "01FF0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    private final String CMD_PS_MODE_STORAGE= "02FE0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    private final String CMD_PS_TEST_ALL = "04FC0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    private final String CMD_SET_CFG_RADIO = "B54B0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    private final String CMD_64BYTES_RECEIVE = "F20E0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,17 +177,9 @@ public class MainActivity extends AppCompatActivity
 
     void processIntent(Intent intent) {
         Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-        // only one message sent during the beam
-        //logger.send("DISCOVERED", tag.toString());
-        //nfcStateSubject.discovered();
         addLineToConsole("Tag descubierto "+tag.toString());
-        //Toast.makeText(getApplicationContext(), "Tag descubierto", Toast.LENGTH_SHORT).show();
         connect(tag);
     }
-
-    //NfcStateSubject nfcStateSubject;
-
-    private Ntag_I2C_Commands channel;
 
     public void addLineToConsole(String line){
         myText.append("\n"+line);
@@ -206,89 +207,44 @@ public class MainActivity extends AppCompatActivity
 
     public void CMD_RESET(View v){
         addLineToConsole("CMD_RESET");
-        if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0x00;
-            command[1] = (byte) (~( 0x00) + 1);
-
-            try {
-                channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-
-            } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
-            }
-        }
+        sendCommand(CMD_RESET);
     }
 
     public void CMD_PS_MODE_WORKING(View v){
         addLineToConsole("CMD_PS_MODE_WORKING");
-        if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0x01;
-            command[1] = (byte) (~( 0x01) + 1);
-
-            try {
-                channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-
-            } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
-            }
-        }
+        sendCommand(CMD_PS_MODE_WORKING);
     }
 
     public void CMD_PS_MODE_STORAGE(View v){
         addLineToConsole("CMD_PS_MODE_STORAGE");
-        if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0x02;
-            command[1] = (byte) (~( 0x02) + 1);
-
-            try {
-                channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-
-            } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
-            }
-        }
+        sendCommand(CMD_PS_MODE_STORAGE);
     }
 
     public void CMD_PS_TEST_ALL(View v){
         addLineToConsole("CMD_PS_TEST_ALL");
-        if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0x04;
-            command[1] = (byte) (~( 0x04) + 1);
-
-            try {
-                channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-
-            } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
-            }
-        }
+        sendCommand(CMD_PS_TEST_ALL);
     }
 
     public void CMD_SET_CFG_RADIO(View v){
         addLineToConsole("CMD_SET_CFG_RADIO");
-        if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0xB5;
-            command[1] = (byte) (~( 0xB5) + 1);
+        sendCommand(CMD_SET_CFG_RADIO);
+    }
 
+    public void sendCommand(String hexCmd){
+        if (isConnected()) {
             try {
                 channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-
+                channel.writeSRAMBlock(ByteUtils.hexToBytes(hexCmd), null);
             } catch (TimeoutException | IOException | FormatException e) {
                 //Timber.e(e);
             }
         }
     }
 
+//    final byte[] command = new byte[64];
+//    command[0] = (byte) 0xB5;
+//    command[1] = (byte) (~( 0xB5) + 1);
+//
     public void connect(Tag tag) {
         try {
             channel = new Ntag_I2C_Commands(tag);
@@ -305,7 +261,7 @@ public class MainActivity extends AppCompatActivity
 
     public boolean isConnected() {
         boolean connected = channel != null && channel.isConnected();
-        estadoNFCText.setText(connected ? "CONNECTED":"DISCONNECTED");
+        estadoNFCText.setText(connected ? "CONECTADO":"DESCONECTADO");
 //        if(!connected)
 //            Toast.makeText(getApplicationContext(), "No esta conectado", Toast.LENGTH_SHORT).show();
         return connected;
@@ -358,8 +314,8 @@ public class MainActivity extends AppCompatActivity
                 CRC32Calculator crc = new CRC32Calculator();
 //                blocks.add(crc.CRC32(createMockFile()));
 //                blocks.add(crc.CRC32(createMockFile()));
-                blocks.add((createMockFile()));
-                blocks.add((createMockFile()));
+                blocks.add(ba);
+                blocks.add(bb);
 
                 for (int i = 0; i < 11; i++) {
                     packageChecksum += command[i];
@@ -388,6 +344,17 @@ public class MainActivity extends AppCompatActivity
             }
         }
 
+    }
+
+    public byte[] addCRC(byte[] arr){
+        byte packageChecksum = 0x00;
+        for (int i = 0; i < arr.length; i++) {
+            packageChecksum += arr[i];
+        }
+        Log.v("checksum -",ByteUtils.bytesToHex(arr));
+        arr[arr.length-2] = packageChecksum;
+        Log.v("checksum ",ByteUtils.bytesToHex(arr));
+        return arr;
     }
 
     public void sendFile() {
@@ -459,23 +426,12 @@ public class MainActivity extends AppCompatActivity
     public boolean readBlock() {
         addLineToConsole("trying to read");
         if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0xf2;
-            command[1] = (byte) (~( 0xf2) + 1);
-
             try {
+                channel.writeSRAMBlock(ByteUtils.hexToBytes(CMD_64BYTES_RECEIVE), null);
                 channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-                Thread.sleep(10);
-
-                channel.waitforI2Cread(100);
-
                 byte[] dataRead = channel.readSRAMBlock();
-
                 addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
-//                addLineToConsole("RECEIVED "+ (dataRead[0] == 0x31));
-
-            } catch (InterruptedException | TimeoutException | IOException | FormatException e) {
+            } catch (TimeoutException | IOException | FormatException e) {
                 //Timber.e(e);
             }
         } else {
