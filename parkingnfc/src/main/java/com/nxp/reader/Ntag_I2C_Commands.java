@@ -37,6 +37,7 @@ import com.nxp.exceptions.CommandNotSupportedException;
 import com.nxp.exceptions.DynamicLockBitsException;
 import com.nxp.exceptions.NotPlusTagException;
 import com.nxp.exceptions.StaticLockBitsException;
+import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteEEPROMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.Ntag_Get_Version.Prod;
@@ -735,7 +736,7 @@ public class Ntag_I2C_Commands extends I2C_Enabled_Commands {
 			
 			if(auth0 != null && auth0.length < 4) {
 				try {
-					readSRAMBlock();
+					readSRAMBlock(null);
 					return AuthStatus.Protected_RW.getValue();
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -775,7 +776,7 @@ public class Ntag_I2C_Commands extends I2C_Enabled_Commands {
 		
 		// Check if the SRAM is lock
 		try {
-			readSRAMBlock();
+			readSRAMBlock(null);
 			return AuthStatus.Protected_RW.getValue();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -915,10 +916,13 @@ public class Ntag_I2C_Commands extends I2C_Enabled_Commands {
 	 * @see com.nxp.reader.I2C_Enabled_Commands#readSRAMBlock()
 	 */
 	@Override
-	public byte[] readSRAMBlock() throws IOException, FormatException {
+	public byte[] readSRAMBlock(ReadSRAMListener listener) throws IOException, FormatException {
 		answer = new byte[0];
 		reader.SectorSelect(sram_sector);
 		answer = reader.fast_read((byte) 0xF0, (byte) 0xFF);
+		// Inform the listener about the writing
+		if(listener != null)
+			listener.onReadSRAM(answer);
 		return answer;
 	}
 
@@ -945,7 +949,7 @@ public class Ntag_I2C_Commands extends I2C_Enabled_Commands {
 					e.printStackTrace();
 				}
 			}
-			temp = readSRAMBlock();
+			temp = readSRAMBlock(null);
 
 			// concat read block to the full response
 			response = concat(response, temp);

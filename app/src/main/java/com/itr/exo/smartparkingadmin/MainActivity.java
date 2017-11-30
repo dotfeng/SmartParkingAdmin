@@ -7,6 +7,7 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Bundle;
 import android.support.v4.widget.NestedScrollView;
+import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -18,6 +19,7 @@ import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.I2C_Enabled_Commands;
 import com.nxp.reader.Ntag_I2C_Commands;
@@ -212,6 +214,10 @@ public class MainActivity extends AppCompatActivity
         sendCommand(ExoCommands.CMD_SET_CFG_RADIO.getBytes());
     }
 
+    public void CMD_FILE_RECEIVE(View v){
+        readFile();
+    }
+
     public void sendCommand(byte[] cmd){
         if (isConnected()) {
             try {
@@ -232,7 +238,7 @@ public class MainActivity extends AppCompatActivity
             channel = new Ntag_I2C_Commands(tag);
             channel.connect();
             addLineToConsole("Conectado a tag");
-            estadoNFCText.setText("CONNECTED");
+            estadoNFCText.setText("CONECTADO");
         } catch (Exception e) {
             estadoNFCText.setText("ERROR");
             addLineToConsole(e.getMessage());
@@ -360,12 +366,7 @@ public class MainActivity extends AppCompatActivity
                 addLineToConsole("SENDING " + ByteUtils.bytesToHex(command));
 
                 channel.waitforI2Cwrite(100);
-                channel.writeSRAMBlock(command, new WriteSRAMListener() {
-                    @Override
-                    public void onWriteSRAM(){
-                        readBlock();
-                    }
-                });
+                channel.writeSRAMBlock(command, null);
 
                 channel.waitforI2Cwrite(100);
                 channel.writeSRAMBlock(createMockFile(), new WriteSRAMListener() {
@@ -400,7 +401,8 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onWriteSRAM() {
                         try{
-                            byte[] dataRead = channel.readSRAMBlock();
+                            channel.waitforI2Cread(100);
+                            byte[] dataRead = channel.readSRAMBlock(null);
                             addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
                         } catch(Exception e){
                             addLineToConsole(e.getMessage());
@@ -420,18 +422,26 @@ public class MainActivity extends AppCompatActivity
     public void readFile() {
         addLineToConsole("READING FILE");
         if (isConnected()) {
-            final byte[] command = new byte[64];
-            command[0] = (byte) 0xf1;
-            command[1] = (byte) (~( 0xf1) + 1);
-
             try {
                 channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, new WriteSRAMListener() {
+                channel.writeSRAMBlock(ExoCommands.CMD_FILE_RECEIVE.getBytes(), new WriteSRAMListener() {
                     @Override
                     public void onWriteSRAM() {
                         try{
-                            byte[] dataRead = channel.readSRAMBlock();
-                            addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
+                            channel.waitforI2Cread(100);
+                            channel.readSRAMBlock(new ReadSRAMListener() {
+                                @Override
+                                public void onReadSRAM(byte[] dataRead) {
+                                    try {
+                                        addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
+                                        addLineToConsole("SENDING OK CMD");
+                                        channel.writeSRAMBlock(ExoCommands.CMD_SEND_OK.getBytes(), null);
+                                    } catch(Exception e){
+                                        addLineToConsole(e.getMessage());
+                                    }
+                                }
+                            });
+
                         } catch(Exception e){
                             addLineToConsole(e.getMessage());
                         }

@@ -38,6 +38,7 @@ import com.nxp.exceptions.CommandNotSupportedException;
 import com.nxp.exceptions.DynamicLockBitsException;
 import com.nxp.exceptions.NotPlusTagException;
 import com.nxp.exceptions.StaticLockBitsException;
+import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteEEPROMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.Ntag_Get_Version.Prod;
@@ -545,7 +546,7 @@ public abstract class I2C_Enabled_Commands {
 	 * @throws FormatException
 	 * @throws CommandNotSupportedException 
 	 */
-	public abstract byte[] readSRAMBlock() throws IOException, FormatException, CommandNotSupportedException;
+	public abstract byte[] readSRAMBlock(ReadSRAMListener listener) throws IOException, FormatException, CommandNotSupportedException;
 
 	/**
 	 * Reads as many Blocks as Specified

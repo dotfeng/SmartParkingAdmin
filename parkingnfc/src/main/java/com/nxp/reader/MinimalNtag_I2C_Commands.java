@@ -38,6 +38,7 @@ import com.nxp.exceptions.CommandNotSupportedException;
 import com.nxp.exceptions.DynamicLockBitsException;
 import com.nxp.exceptions.NotPlusTagException;
 import com.nxp.exceptions.StaticLockBitsException;
+import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteEEPROMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.Ntag_Get_Version.Prod;
@@ -454,7 +455,7 @@ public class MinimalNtag_I2C_Commands extends I2C_Enabled_Commands {
 	 * @see com.nxp.reader.I2C_Enabled_Commands#readSRAMBlock()
 	 */
 	@Override
-	public byte[] readSRAMBlock() throws IOException, FormatException, CommandNotSupportedException {
+	public byte[] readSRAMBlock(ReadSRAMListener listener) throws IOException, FormatException, CommandNotSupportedException {
 		if (tag_type == Prod.NTAG_I2C_2k)
 			throw new CommandNotSupportedException(
 					"readSRAMBlock is not Supported for this Phone with NTAG I2C 2k");
@@ -494,7 +495,7 @@ public class MinimalNtag_I2C_Commands extends I2C_Enabled_Commands {
 					Log.e(LOG_TAG, "Unexpected error", e);
 				}
 			}
-			temp = readSRAMBlock();
+			temp = readSRAMBlock(null);
 
 			// concat read block to the full response
 			response = concat(response, temp);
@@ -959,7 +960,7 @@ public class MinimalNtag_I2C_Commands extends I2C_Enabled_Commands {
 			
 			if(auth0 != null && auth0.length < 4) {
 				try {
-					readSRAMBlock();
+					readSRAMBlock(null);
 					return AuthStatus.Protected_RW.getValue();
 				} catch (IOException e) {
 					Log.e(LOG_TAG, "Unexpected error", e);
@@ -995,7 +996,7 @@ public class MinimalNtag_I2C_Commands extends I2C_Enabled_Commands {
 		
 		// Check if the SRAM is lock
 		try {
-			readSRAMBlock();
+			readSRAMBlock(null);
 			return AuthStatus.Protected_RW.getValue();
 		} catch (IOException | FormatException | CommandNotSupportedException e) {
 			Log.e(LOG_TAG, "Unexpected error", e);
