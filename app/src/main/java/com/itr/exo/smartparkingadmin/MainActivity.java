@@ -7,12 +7,10 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Bundle;
 import android.support.v4.widget.NestedScrollView;
-import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
@@ -20,23 +18,15 @@ import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.nxp.crypto.CRC32Calculator;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.I2C_Enabled_Commands;
 import com.nxp.reader.Ntag_I2C_Commands;
 import com.nxp.ByteUtils;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import io.reactivex.Observable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.schedulers.Schedulers;
 
 
 public class MainActivity extends AppCompatActivity
@@ -52,13 +42,6 @@ public class MainActivity extends AppCompatActivity
     private TextView estadoNFCText = null;
 
     private NestedScrollView consoleScroll = null;
-
-    private final String CMD_RESET = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    private final String CMD_PS_MODE_WORKING = "01FF0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    private final String CMD_PS_MODE_STORAGE= "02FE0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    private final String CMD_PS_TEST_ALL = "04FC0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    private final String CMD_SET_CFG_RADIO = "B54B0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    private final String CMD_64BYTES_RECEIVE = "F20E0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -149,7 +132,6 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onNewIntent(Intent intent) {
         // onResume gets called after this to handle the intent
-        //Timber.e("NEW INTENT %s", intent.getAction());
         setIntent(intent);
     }
 
@@ -207,36 +189,36 @@ public class MainActivity extends AppCompatActivity
 
     public void CMD_RESET(View v){
         addLineToConsole("CMD_RESET");
-        sendCommand(CMD_RESET);
+        sendCommand(ExoCommands.CMD_RESET.getBytes());
     }
 
     public void CMD_PS_MODE_WORKING(View v){
         addLineToConsole("CMD_PS_MODE_WORKING");
-        sendCommand(CMD_PS_MODE_WORKING);
+        sendCommand(ExoCommands.CMD_PS_MODE_WORKING.getBytes());
     }
 
     public void CMD_PS_MODE_STORAGE(View v){
         addLineToConsole("CMD_PS_MODE_STORAGE");
-        sendCommand(CMD_PS_MODE_STORAGE);
+        sendCommand(ExoCommands.CMD_PS_MODE_STORAGE.getBytes());
     }
 
     public void CMD_PS_TEST_ALL(View v){
         addLineToConsole("CMD_PS_TEST_ALL");
-        sendCommand(CMD_PS_TEST_ALL);
+        sendCommand(ExoCommands.CMD_PS_TEST_ALL.getBytes());
     }
 
     public void CMD_SET_CFG_RADIO(View v){
         addLineToConsole("CMD_SET_CFG_RADIO");
-        sendCommand(CMD_SET_CFG_RADIO);
+        sendCommand(ExoCommands.CMD_SET_CFG_RADIO.getBytes());
     }
 
-    public void sendCommand(String hexCmd){
+    public void sendCommand(byte[] cmd){
         if (isConnected()) {
             try {
                 channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(ByteUtils.hexToBytes(hexCmd), null);
+                channel.writeSRAMBlock(cmd, null);
             } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
+                addLineToConsole(e.getMessage());
             }
         }
     }
@@ -249,9 +231,7 @@ public class MainActivity extends AppCompatActivity
         try {
             channel = new Ntag_I2C_Commands(tag);
             channel.connect();
-            //Toast.makeText(getApplicationContext(), "Conectado a tag", Toast.LENGTH_SHORT).show();
             addLineToConsole("Conectado a tag");
-            //addLineToConsole("fast write " + channel.checkPTwritePossible());
             estadoNFCText.setText("CONNECTED");
         } catch (Exception e) {
             estadoNFCText.setText("ERROR");
@@ -311,9 +291,7 @@ public class MainActivity extends AppCompatActivity
                 bb[4] = 0x74;
                 bb[5] = 0x61;
                 bb[6] = 0x6c;
-                CRC32Calculator crc = new CRC32Calculator();
-//                blocks.add(crc.CRC32(createMockFile()));
-//                blocks.add(crc.CRC32(createMockFile()));
+
                 blocks.add(ba);
                 blocks.add(bb);
 
@@ -340,26 +318,14 @@ public class MainActivity extends AppCompatActivity
                     });
                 }
             } catch (Exception e) {
-
+                addLineToConsole(e.getMessage());
             }
         }
 
     }
 
-    public byte[] addCRC(byte[] arr){
-        byte packageChecksum = 0x00;
-        for (int i = 0; i < arr.length; i++) {
-            packageChecksum += arr[i];
-        }
-        Log.v("checksum -",ByteUtils.bytesToHex(arr));
-        arr[arr.length-2] = packageChecksum;
-        Log.v("checksum ",ByteUtils.bytesToHex(arr));
-        return arr;
-    }
-
     public void sendFile() {
         addLineToConsole("Sending file Channel connected "+ isConnected());
-        //Log.v("Sending file","Channel connected "+ (channel!=null && channel.isConnected()));
         if (isConnected()) {
             final byte[] command = new byte[64];
             command[0] = (byte) 0xf0;
@@ -392,12 +358,16 @@ public class MainActivity extends AppCompatActivity
 
             try {
                 addLineToConsole("SENDING " + ByteUtils.bytesToHex(command));
-                Log.v("SENDING", "enviando");
-                channel.waitforI2Cwrite(100);
-                channel.writeSRAMBlock(command, null);
-                Thread.sleep(10);
 
-                channel.waitforI2Cwrite(100); // @Eric - Tiempo de timeot a respuesta del tag (decia 100)
+                channel.waitforI2Cwrite(100);
+                channel.writeSRAMBlock(command, new WriteSRAMListener() {
+                    @Override
+                    public void onWriteSRAM(){
+                        readBlock();
+                    }
+                });
+
+                channel.waitforI2Cwrite(100);
                 channel.writeSRAMBlock(createMockFile(), new WriteSRAMListener() {
                     @Override
                     public void onWriteSRAM(){
@@ -406,9 +376,8 @@ public class MainActivity extends AppCompatActivity
                 });
 
 
-            } catch (InterruptedException | TimeoutException | IOException | FormatException e) {
-                Log.v("error","volo todo");
-                //Timber.e(e);
+            } catch (TimeoutException | IOException | FormatException e) {
+                addLineToConsole(e.getMessage());
             }
         }
     }
@@ -424,15 +393,23 @@ public class MainActivity extends AppCompatActivity
     }
 
     public boolean readBlock() {
-        addLineToConsole("trying to read");
+        addLineToConsole("READING BLOCK");
         if (isConnected()) {
             try {
-                channel.writeSRAMBlock(ByteUtils.hexToBytes(CMD_64BYTES_RECEIVE), null);
-                channel.waitforI2Cread(100);
-                byte[] dataRead = channel.readSRAMBlock();
-                addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
-            } catch (TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
+                channel.writeSRAMBlock(ExoCommands.CMD_64BYTES_RECEIVE.getBytes(), new WriteSRAMListener() {
+                    @Override
+                    public void onWriteSRAM() {
+                        try{
+                            byte[] dataRead = channel.readSRAMBlock();
+                            addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
+                        } catch(Exception e){
+                            addLineToConsole(e.getMessage());
+                        }
+
+                    }
+                });
+            } catch (IOException | FormatException e) {
+                addLineToConsole(e.getMessage());
             }
         } else {
             return false;
@@ -441,26 +418,28 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void readFile() {
-        //Timber.d("Sending file. Channel connected %b", channel.isConnected());
-        if (channel.isConnected()) {
+        addLineToConsole("READING FILE");
+        if (isConnected()) {
             final byte[] command = new byte[64];
             command[0] = (byte) 0xf1;
             command[1] = (byte) (~( 0xf1) + 1);
 
             try {
                 channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(command, null);
-                Thread.sleep(10);
+                channel.writeSRAMBlock(command, new WriteSRAMListener() {
+                    @Override
+                    public void onWriteSRAM() {
+                        try{
+                            byte[] dataRead = channel.readSRAMBlock();
+                            addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
+                        } catch(Exception e){
+                            addLineToConsole(e.getMessage());
+                        }
+                    }
+                });
 
-                channel.waitforI2Cread(100);
-
-                byte[] dataRead = channel.readSRAMBlock();
-
-                //Timber.d("RECEIVED %s", ByteUtils.bytesToHex(dataRead));
-                //logger.send("RECEIVED", command);
-
-            } catch (InterruptedException | TimeoutException | IOException | FormatException e) {
-                //Timber.e(e);
+            } catch (TimeoutException | IOException | FormatException e) {
+                addLineToConsole(e.getMessage());
             }
         }
     }

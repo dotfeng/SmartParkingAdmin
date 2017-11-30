@@ -3,11 +3,14 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/SmartParkingAdmin.iml" filepath="$PROJECT_DIR$/SmartParkingAdmin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SmartParkingAdmin.iml" filepath="$PROJECT_DIR$/SmartParkingAdmin.iml" />
       <module fileurl="file://C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\SmartParkingAdmin.iml" filepath="C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\SmartParkingAdmin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\app\app.iml" filepath="C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\app\app.iml" />
       <module fileurl="file://$PROJECT_DIR$/parkingnfc/parkingnfc.iml" filepath="$PROJECT_DIR$/parkingnfc/parkingnfc.iml" />
       <module fileurl="file://C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\parkingnfc\parkingnfc.iml" filepath="C:\Users\Gonza\Documents\GitHub\SmartParkingAdmin\parkingnfc\parkingnfc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/parkingnfc/parkingnfc.iml" filepath="$PROJECT_DIR$/parkingnfc/parkingnfc.iml" />
     </modules>
   </component>
 </project>
