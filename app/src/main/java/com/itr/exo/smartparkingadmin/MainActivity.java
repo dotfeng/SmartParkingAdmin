@@ -19,6 +19,7 @@ import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.nxp.crypto.CRC32Calculator;
 import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.I2C_Enabled_Commands;
@@ -27,8 +28,10 @@ import com.nxp.ByteUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.zip.CRC32;
 
 
 public class MainActivity extends AppCompatActivity
@@ -167,6 +170,7 @@ public class MainActivity extends AppCompatActivity
 
     public void addLineToConsole(String line){
         myText.append("\n"+line);
+        Log.d("action",line != null ? line : "");
         consoleScroll.post(new Runnable() {
             @Override
             public void run() {
@@ -275,32 +279,15 @@ public class MainActivity extends AppCompatActivity
                 command[7] = (byte) 0x00;
                 command[8] = (byte) 0x00;
 
-                // file checksum
-                command[9] = (byte) 0x04;
-                command[10] = (byte) 0x00;
+                List<byte[]> blocks = new ArrayList<>();
+
+                blocks.add(ByteUtils.hexToBytes("686F6C61000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"));
+                blocks.add(ByteUtils.hexToBytes("7175652074616C000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"));
+                byte[] aa = ByteUtils.hexToBytes("686F6C610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007175652074616C000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+
+                appendFileCrc(aa,command);
 
                 byte packageChecksum = 0x00;
-                List<byte[]> blocks = new ArrayList<byte[]>();
-                final byte[] ba = new byte[64];
-                final byte[] bb = new byte[64];
-
-                ba[0] = (byte) 0x68;
-                ba[1] = (byte) 0x6f;
-                ba[2] = (byte) 0x6c;
-                ba[3] = (byte) 0x61;
-
-
-                bb[0] = 0x71;
-                bb[1] = 0x75;
-                bb[2] = 0x65;
-                bb[3] = 0x20;
-                bb[4] = 0x74;
-                bb[5] = 0x61;
-                bb[6] = 0x6c;
-
-                blocks.add(ba);
-                blocks.add(bb);
-
                 for (int i = 0; i < 11; i++) {
                     packageChecksum += command[i];
                 }
@@ -309,6 +296,8 @@ public class MainActivity extends AppCompatActivity
 
                 command[11] = packageChecksum;
 
+                addLineToConsole("SENDING CMD " + ByteUtils.bytesToHex(command));
+
                 channel.waitforI2Cread(DELAY_TIME);
 
                 channel.writeSRAMBlock(command, null);
@@ -316,13 +305,10 @@ public class MainActivity extends AppCompatActivity
                 for (int i = 0; i < blocks.size(); i++) {
                     addLineToConsole("escribiendo paquete " + i);
                     channel.waitforI2Cread(DELAY_TIME);
-                    channel.writeSRAMBlock(blocks.get(i), new WriteSRAMListener() {
-                        @Override
-                        public void onWriteSRAM(){
-                            readBlock();
-                        }
-                    });
+                    addLineToConsole("SENDING " + ByteUtils.bytesToHex(blocks.get(i)));
+                    channel.writeSRAMBlock(blocks.get(i), null);
                 }
+                readBlock();
             } catch (Exception e) {
                 addLineToConsole(e.getMessage());
             }
@@ -331,7 +317,6 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void sendFile() {
-        addLineToConsole("Sending file Channel connected "+ isConnected());
         if (isConnected()) {
             final byte[] command = new byte[64];
             command[0] = (byte) 0xf0;
@@ -352,6 +337,8 @@ public class MainActivity extends AppCompatActivity
             command[9] = (byte) 0x04;
             command[10] = (byte) 0x00;
 
+            appendFileCrc(createMockFile(),command);
+
             byte packageChecksum = 0x00;
 
             for (int i=0; i < 11; i++) {
@@ -363,12 +350,13 @@ public class MainActivity extends AppCompatActivity
             command[11] = packageChecksum;
 
             try {
-                addLineToConsole("SENDING " + ByteUtils.bytesToHex(command));
+                addLineToConsole("SENDING CMD " + ByteUtils.bytesToHex(command));
 
-                channel.waitforI2Cwrite(100);
+                channel.waitforI2Cwrite(DELAY_TIME);
                 channel.writeSRAMBlock(command, null);
 
-                channel.waitforI2Cwrite(100);
+                channel.waitforI2Cwrite(DELAY_TIME);
+                addLineToConsole("SENDING " + ByteUtils.bytesToHex(createMockFile()));
                 channel.writeSRAMBlock(createMockFile(), new WriteSRAMListener() {
                     @Override
                     public void onWriteSRAM(){
@@ -381,6 +369,18 @@ public class MainActivity extends AppCompatActivity
                 addLineToConsole(e.getMessage());
             }
         }
+    }
+
+    public void appendFileCrc(byte[] file, byte[] command) {
+        int crc = 0x0000;
+
+        for(byte b : file)
+        {
+            crc +=b;
+        }
+
+        command[9] = (byte) ((crc & 0x000000ff));
+        command[10] = (byte) ((crc & 0x0000ff00) >>> 8);
     }
 
     public byte[] createMockFile() {
@@ -423,12 +423,12 @@ public class MainActivity extends AppCompatActivity
         addLineToConsole("READING FILE");
         if (isConnected()) {
             try {
-                channel.waitforI2Cread(100);
+                channel.waitforI2Cread(DELAY_TIME);
                 channel.writeSRAMBlock(ExoCommands.CMD_FILE_RECEIVE.getBytes(), new WriteSRAMListener() {
                     @Override
                     public void onWriteSRAM() {
                         try{
-                            channel.waitforI2Cread(100);
+                            channel.waitforI2Cread(DELAY_TIME);
                             channel.readSRAMBlock(new ReadSRAMListener() {
                                 @Override
                                 public void onReadSRAM(byte[] dataRead) {
