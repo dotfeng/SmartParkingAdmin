@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.itr.exo.smartparkingadmin.SummaryEditTextPreference
+        android:key="write_timeout"
+        android:title="@string/settings_write_timeout"
+        android:summary="%s ms"
+        android:inputType="number"
+        android:text="@string/settings_write_timeout"
+        android:defaultValue="200"
+        />
+    <com.itr.exo.smartparkingadmin.SummaryEditTextPreference
+        android:key="id_read_timeout"
+        android:title="@string/settings_id_read_timeout"
+        android:summary="%s ms"
+        android:inputType="number"
+        android:text="@string/settings_id_read_timeout"
+        android:defaultValue="2000"
+        />
+
+</PreferenceScreen>

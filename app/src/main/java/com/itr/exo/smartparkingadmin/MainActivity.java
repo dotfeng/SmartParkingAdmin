@@ -2,10 +2,13 @@ package com.itr.exo.smartparkingadmin;
 
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.nfc.FormatException;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Bundle;
+import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.support.v4.widget.NestedScrollView;
 import android.util.Log;
 import android.view.View;
@@ -19,20 +22,17 @@ import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.nxp.crypto.CRC32Calculator;
 import com.nxp.listeners.ReadSRAMListener;
 import com.nxp.listeners.WriteSRAMListener;
 import com.nxp.reader.I2C_Enabled_Commands;
 import com.nxp.reader.Ntag_I2C_Commands;
 import com.nxp.ByteUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.CRC32;
-
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
@@ -47,6 +47,9 @@ public class MainActivity extends AppCompatActivity
     private TextView estadoNFCText = null;
 
     private NestedScrollView consoleScroll = null;
+    SharedPreferences prefs;
+    private static int DELAY_TIME;
+    private static int READ_ID_DELAY_TIME;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,8 +57,7 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
-//        DrawerLayout drawer = findViewById(R.id.drawer_layout);
+        //        DrawerLayout drawer = findViewById(R.id.drawer_layout);
 //        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
 //                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
 //        drawer.addDrawerListener(toggle);
@@ -75,6 +77,10 @@ public class MainActivity extends AppCompatActivity
                 getApplicationContext(), getClass())
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
         setupNfcAdapter();
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        DELAY_TIME = Integer.parseInt(prefs.getString("write_timeout","100"));
+        READ_ID_DELAY_TIME = Integer.parseInt(prefs.getString("id_read_timeout","2000"));
+
     }
 
     @Override
@@ -103,7 +109,7 @@ public class MainActivity extends AppCompatActivity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
-            return true;
+            showSettingsFragment();
         }
 
         return super.onOptionsItemSelected(item);
@@ -147,10 +153,17 @@ public class MainActivity extends AppCompatActivity
         if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(getIntent().getAction())) {
             processIntent(getIntent());
         }
+        DELAY_TIME = Integer.parseInt(prefs.getString("write_timeout","100"));
+        READ_ID_DELAY_TIME = Integer.parseInt(prefs.getString("id_read_timeout","2000"));
 
         if (nfcAdapter != null) {
             nfcAdapter.enableForegroundDispatch(this, pendingIntent, null, null);
         }
+    }
+
+    private void showSettingsFragment() {
+        Intent goToNextActivity = new Intent(getApplicationContext(), SettingsActivity.class);
+        startActivity(goToNextActivity);
     }
 
     private void setupNfcAdapter() {
@@ -169,14 +182,27 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void addLineToConsole(String line){
-        myText.append("\n"+line);
-        Log.d("action",line != null ? line : "");
-        consoleScroll.post(new Runnable() {
+        new Thread(new Runnable() {
             @Override
-            public void run() {
-                consoleScroll.fullScroll(View.FOCUS_DOWN);
+            public void run()
+            {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        myText.append("\n"+line);
+                        Log.d("action",line != null ? line : "");
+                        consoleScroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                consoleScroll.fullScroll(View.FOCUS_DOWN);
+                            }
+                        });
+                    }
+                });
             }
-        });
+        }).start();
+
     }
 
     public void send64k(View v){
@@ -190,53 +216,75 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void read64Block(View v){
-        readBlock();
+        readBlock(null);
     }
 
     public void CMD_RESET(View v){
         addLineToConsole("CMD_RESET");
-        sendCommand(ExoCommands.CMD_RESET.getBytes());
+        sendCommand(ExoCommands.CMD_RESET.getBytes(),null);
     }
 
     public void CMD_PS_MODE_WORKING(View v){
         addLineToConsole("CMD_PS_MODE_WORKING");
-        sendCommand(ExoCommands.CMD_PS_MODE_WORKING.getBytes());
+        sendCommand(ExoCommands.CMD_PS_MODE_WORKING.getBytes(),null);
     }
 
     public void CMD_PS_MODE_STORAGE(View v){
         addLineToConsole("CMD_PS_MODE_STORAGE");
-        sendCommand(ExoCommands.CMD_PS_MODE_STORAGE.getBytes());
+        sendCommand(ExoCommands.CMD_PS_MODE_STORAGE.getBytes(),null);
     }
 
     public void CMD_PS_TEST_ALL(View v){
         addLineToConsole("CMD_PS_TEST_ALL");
-        sendCommand(ExoCommands.CMD_PS_TEST_ALL.getBytes());
+        sendCommand(ExoCommands.CMD_PS_TEST_ALL.getBytes(),null);
     }
 
     public void CMD_SET_CFG_RADIO(View v){
         addLineToConsole("CMD_SET_CFG_RADIO");
-        sendCommand(ExoCommands.CMD_SET_CFG_RADIO.getBytes());
+        sendCommand(ExoCommands.CMD_SET_CFG_RADIO.getBytes(),null);
+    }
+
+//    final byte[] command = new byte[64];
+//    command[0] = (byte) 0x15;
+//    command[1] = (byte) (~( 0x15) + 1);
+
+    public void CMD_DEVICE_INFORMATION(View v){
+        addLineToConsole("CMD_DEVICE_INFORMATION");
+        sendCommand(ExoCommands.CMD_DEVICE_INFORMATION.getBytes(), new WriteSRAMListener() {
+            @Override
+            public void onWriteSRAM() {
+                readBlock(READ_ID_DELAY_TIME);
+            }
+        });
     }
 
     public void CMD_FILE_RECEIVE(View v){
         readFile();
     }
 
-    public void sendCommand(byte[] cmd){
+    public void sendCommand(byte[] cmd, WriteSRAMListener listener){
         if (isConnected()) {
-            try {
-                channel.waitforI2Cread(100);
-                channel.writeSRAMBlock(cmd, null);
-            } catch (TimeoutException | IOException | FormatException e) {
-                addLineToConsole(e.getMessage());
-            }
-        }
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        channel.waitforI2Cread(100);
+                        channel.writeSRAMBlock(cmd, listener != null ? listener : new WriteSRAMListener() {
+                            @Override
+                            public void onWriteSRAM() {
+                                readBlock(null);
+                            }
+                        });
+                    } catch (TimeoutException | IOException | FormatException e) {
+                        addLineToConsole(e.getMessage());
+                    }
+                }
+        }).start();
+        }else
+            addLineToConsole("Tag disconnected.");
     }
 
-//    final byte[] command = new byte[64];
-//    command[0] = (byte) 0xB5;
-//    command[1] = (byte) (~( 0xB5) + 1);
-//
+
     public void connect(Tag tag) {
         try {
             channel = new Ntag_I2C_Commands(tag);
@@ -251,14 +299,24 @@ public class MainActivity extends AppCompatActivity
 
     public boolean isConnected() {
         boolean connected = channel != null && channel.isConnected();
-        estadoNFCText.setText(connected ? "CONECTADO":"DESCONECTADO");
-//        if(!connected)
-//            Toast.makeText(getApplicationContext(), "No esta conectado", Toast.LENGTH_SHORT).show();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run()
+            {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        estadoNFCText.setText(connected ? "CONECTADO":"DESCONECTADO");
+                    }
+                });
+            }
+        }).start();
         return connected;
     }
 
     private I2C_Enabled_Commands.R_W_Methods method;
-    private static final int DELAY_TIME 		= 100;
 
     public void fastWrite(){
         method = I2C_Enabled_Commands.R_W_Methods.Fast_Mode;
@@ -308,7 +366,7 @@ public class MainActivity extends AppCompatActivity
                     addLineToConsole("SENDING " + ByteUtils.bytesToHex(blocks.get(i)));
                     channel.writeSRAMBlock(blocks.get(i), null);
                 }
-                readBlock();
+                readBlock(null);
             } catch (Exception e) {
                 addLineToConsole(e.getMessage());
             }
@@ -360,7 +418,7 @@ public class MainActivity extends AppCompatActivity
                 channel.writeSRAMBlock(createMockFile(), new WriteSRAMListener() {
                     @Override
                     public void onWriteSRAM(){
-                        readBlock();
+                        readBlock(null);
                     }
                 });
 
@@ -393,7 +451,7 @@ public class MainActivity extends AppCompatActivity
         return command;
     }
 
-    public boolean readBlock() {
+    public boolean readBlock(Integer timeout) {
         addLineToConsole("READING BLOCK");
         if (isConnected()) {
             try {
@@ -401,7 +459,7 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onWriteSRAM() {
                         try{
-                            channel.waitforI2Cread(100);
+                            channel.waitforI2Cread(timeout != null ? timeout:DELAY_TIME);
                             byte[] dataRead = channel.readSRAMBlock(null);
                             addLineToConsole("RECEIVED "+ ByteUtils.bytesToHex(dataRead));
                         } catch(Exception e){
@@ -453,4 +511,5 @@ public class MainActivity extends AppCompatActivity
             }
         }
     }
+
 }
